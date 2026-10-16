@@ -1,20 +1,19 @@
-with open("../data/test/test.txt", "r", encoding="utf-8") as file:
-    samples = file.read().splitlines()
+import os
 
+dir = config.get("samples_dir", "../data/test")
+file = config.get("samples_file", "test.txt")
+
+full_path = os.path.join(dir, file)
+
+with open(full_path, "r", encoding="utf-8") as file:
+    samples = file.read().splitlines()
 
 rule all:
 	input:
-		#Plots
 		"../results/multiqc_report.html",
 		expand("../data/quality_control/library_saturation/{samples}.png", samples=samples),
 		expand("../data/quality_control/rna_features/{samples}.png", samples=samples),
 		"../results/umap_cluster.png",
-
-		#Data
-		expand("../data/kb_counts/{samples}/counts_filtered/adata.h5ad", samples=samples),
-		expand("../data/kb_counts/{samples}/counts_filtered/cells_x_genes.genes.names.txt", samples=samples),
-		expand("../data/seurat_objs/{samples}/{samples}.norm.rds", samples=samples),
-		"../data/seurat_objs/merged/merged.norm.rds",
 		"../results/clusterfeatures.csv"
 
 
@@ -47,15 +46,15 @@ rule fastqc:
 	params:
 		dir = "../data/quality_control/fastqc/{samples}"
 	input:
-		"../data/quality_control/fastq/{samples}/{samples}_2.fastq",
-		"../data/quality_control/fastq/{samples}/{samples}_3.fastq"
+		"../data/fastq/{samples}/{samples}_2.fastq",
+		"../data/fastq/{samples}/{samples}_3.fastq"
 	output:
 		"../data/quality_control/fastqc/{samples}/{samples}_2_fastqc.html",
 		"../data/quality_control/fastqc/{samples}/{samples}_2_fastqc.zip",
 		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.html",
 		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.zip"
 	shell:
-		"fastqc {input} -o {params.dir}"
+		"fastqc {input} --outdir {params.dir}"
 
 
 rule sample_multiqc:
@@ -63,21 +62,27 @@ rule sample_multiqc:
 		in_dir = "../data/quality_control/fastqc/{samples}",
 		out_dir = "../data/quality_control/multiqc/{samples}",
 		filename = "{samples}_multiqc"
+	input:
+		"../data/quality_control/fastqc/{samples}/{samples}_2_fastqc.html",
+		"../data/quality_control/fastqc/{samples}/{samples}_2_fastqc.zip",
+		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.html",
+		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.zip"	
 	output:
 		"../data/quality_control/multiqc/{samples}/{samples}_multiqc.html"
 	shell:
 		"multiqc {params.in_dir} --filename {params.filename} -o {params.out_dir}"
 
 
-rule fastqc_multiqc:
+rule agg_multiqc:
 	params:
-		dir = "../data/quality_control/multiqc"
+		in_dir = "../data/quality_control/multiqc",
+		out_dir = "../results"
 	input:
 		expand("../data/quality_control/multiqc/{samples}/{samples}_multiqc.html", samples=samples)
 	output:
 		"../results/multiqc_report.html"
 	shell:
-		"multiqc {params.dir} -o {params.dir} --filename multiqc_report"
+		"multiqc {params.in_dir} -o {params.out_dir} --filename multiqc_report"
 
 
 rule ref_index:
@@ -90,28 +95,27 @@ rule ref_index:
 
 rule kb_align:
 	params:
-		out_dir="../data/kb_counts/{samples}",
-		index="../data/ref_index/index.idx",
-		t2g="../data/ref_index/t2g.txt"
+		out_dir="../data/kb_counts/{samples}"
 	input:
-		"../data/fastq/{samples}/{samples}_2.fastq",
-		"../data/fastq/{samples}/{samples}_3.fastq"
+		index = "../data/ref_index/index.idx",
+		t2g = "../data/ref_index/t2g.txt",
+		read_2 = "../data/fastq/{samples}/{samples}_2.fastq",
+		read_3 = "../data/fastq/{samples}/{samples}_3.fastq"
 	output:
 		"../data/kb_counts/{samples}/counts_filtered/adata.h5ad",
-		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.genes.names.txt"
+		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.genes.names.txt",
+		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.mtx"
 	shell:
-		"kb count -i {params.index} -g {params.t2g} -o {params.out_dir} -x 10xv3 --filter bustools --h5ad -t 2 {input}"
+		"kb count -i {input.index} -g {input.t2g} -o {params.out_dir} -x 10xv3 --filter bustools --h5ad -t 2 {input.read_2} {input.read_3}"
 
 
 rule kb_qc:
-	params:
-		sample = "{samples}"
 	input:
 		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.mtx"
 	output:
 		"../data/quality_control/library_saturation/{samples}.png"
 	shell:
-		"Rscript kb_qc.R -i {input} -n {params.sample} -o {output}"
+		"Rscript kb_qc.R -i {input} -n {samples} -o {output}"
 	
 
 rule to_seurat:
@@ -126,7 +130,7 @@ rule to_seurat:
 		"Rscript to_seurat.R -i {input.adata} -g {input.gene_ids} -n {params.sample} -o {output}"
 
 
-rule rna_features:
+rule lib_saturation:
 	params:
 		sample = "{samples}"
 	input:
@@ -137,13 +141,14 @@ rule rna_features:
 		"Rscript seurat_qc.R -i {input} -o {output}"
 
 		
-rule merge_counts:
+rule layer_seurat:
 	input:
-		"../data/test/test.txt"
+		dir = "../data/test/test.txt",
+		objs = expand("../data/seurat_objs/{samples}/{samples}.norm.rds", samples=samples)
 	output:
 		"../data/seurat_objs/merged/merged.norm.rds"
 	shell:
-		"Rscript merge_seurat.R -i {input} -o {output}"
+		"Rscript merge_seurat.R -i {input.dir} -o {output}"
 
 
 rule cluster:
@@ -154,3 +159,4 @@ rule cluster:
 		"../results/clusterfeatures.csv"
 	shell:
 		"Rscript cluster.R -i {input}"
+
