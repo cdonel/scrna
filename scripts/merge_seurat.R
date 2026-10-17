@@ -17,7 +17,7 @@ seurat_samples <- c()
 
 for (sample in sra_ids) {
      seurat_samples <- append(seurat_samples,
-                              readRDS(str_glue("../data/seurat/seurat_objs/{sample}/{sample}.norm.rds")))
+                              readRDS(str_glue("../data/seurat_objs/{sample}/{sample}.norm.rds")))
 }
 
 
