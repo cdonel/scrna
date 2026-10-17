@@ -1,5 +1,4 @@
 library(Seurat)
-library(SeuratObject)
 library(stringr)
 library(argparse)
 
