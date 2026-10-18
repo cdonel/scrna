@@ -8,6 +8,6 @@ dependencies:
   - r-ggplot2
   - r-anndata
   - r-argparse
-  - r-Matrix
+  - r-Matrix=1.7.5
   - r-Seurat
   - r-scico
