@@ -129,7 +129,7 @@ rule kb_qc:
 	output:
 		"../data/quality_control/library_saturation/{samples}.png"
 	conda:
-		"../envs/kb.yaml"
+		"../envs/seurat.yaml"
 	shell:
 		"Rscript kb_qc.R -i {input} -n {samples} -o {output}"
 	
