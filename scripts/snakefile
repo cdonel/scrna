@@ -25,6 +25,8 @@ rule prefetch:
 		samples = "{samples}"
 	output:
 		"../data/fastq/{samples}/{samples}.sra"
+	conda:
+		"../envs/fetch.yaml"
 	shell:
 		"prefetch {params.samples} -O {params.dir}"
 
@@ -38,6 +40,8 @@ rule fasterq_dump:
 		"../data/fastq/{samples}/{samples}_1.fastq",
 		"../data/fastq/{samples}/{samples}_2.fastq",
 		"../data/fastq/{samples}/{samples}_3.fastq"
+	conda:
+		"../envs/fetch.yaml"
 	shell:
 		"fasterq-dump --split-files --include-technical {params.dir} -O {params.dir}"
 
@@ -53,10 +57,12 @@ rule fastqc:
 		"../data/quality_control/fastqc/{samples}/{samples}_2_fastqc.zip",
 		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.html",
 		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.zip"
+	conda:
+		"../envs/multiqc.yaml"
 	shell:
 		"fastqc {input} --outdir {params.dir}"
 
-
+	
 rule sample_multiqc:
 	params:
 		in_dir = "../data/quality_control/fastqc/{samples}",
@@ -69,6 +75,8 @@ rule sample_multiqc:
 		"../data/quality_control/fastqc/{samples}/{samples}_3_fastqc.zip"	
 	output:
 		"../data/quality_control/multiqc/{samples}/{samples}_multiqc.html"
+	conda:
+		"../envs/multiqc.yaml"
 	shell:
 		"multiqc {params.in_dir} --filename {params.filename} -o {params.out_dir}"
 
@@ -81,6 +89,8 @@ rule agg_multiqc:
 		expand("../data/quality_control/multiqc/{samples}/{samples}_multiqc.html", samples=samples)
 	output:
 		"../results/multiqc_report.html"
+	conda:
+		"../envs/multiqc.yaml"
 	shell:
 		"multiqc {params.in_dir} -o {params.out_dir} --filename multiqc_report"
 
@@ -89,6 +99,8 @@ rule ref_index:
 	output:
 		"../data/ref_index/index.idx",
 		"../data/ref_index/t2g.txt"
+	conda:
+		"../envs/kb.yaml"
 	shell:
 		"kb ref -d human -i ../data/ref_index/index.idx -g ../data/ref_index/t2g.txt"
 
@@ -105,6 +117,8 @@ rule kb_align:
 		"../data/kb_counts/{samples}/counts_filtered/adata.h5ad",
 		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.genes.names.txt",
 		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.mtx"
+	conda:
+		"../envs/kb.yaml"
 	shell:
 		"kb count -i {input.index} -g {input.t2g} -o {params.out_dir} -x 10xv3 --filter bustools --h5ad -t 2 {input.read_2} {input.read_3}"
 
@@ -114,6 +128,8 @@ rule kb_qc:
 		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.mtx"
 	output:
 		"../data/quality_control/library_saturation/{samples}.png"
+	conda:
+		"../envs/kb.yaml"
 	shell:
 		"Rscript kb_qc.R -i {input} -n {samples} -o {output}"
 	
@@ -126,6 +142,8 @@ rule to_seurat:
 		gene_ids = "../data/kb_counts/{samples}/counts_filtered/cells_x_genes.genes.names.txt"
 	output:
 		"../data/seurat_objs/{samples}/{samples}.norm.rds"
+	conda:
+		"../envs/seurat.yaml"
 	shell:
 		"Rscript to_seurat.R -i {input.adata} -g {input.gene_ids} -n {params.sample} -o {output}"
 
@@ -137,6 +155,8 @@ rule lib_saturation:
 		"../data/seurat_objs/{samples}/{samples}.norm.rds"
 	output:
 		"../data/quality_control/rna_features/{samples}.png"
+	conda:
+		"../envs/seurat.yaml"
 	shell:
 		"Rscript seurat_qc.R -i {input} -o {output}"
 
@@ -147,6 +167,8 @@ rule layer_seurat:
 		objs = expand("../data/seurat_objs/{samples}/{samples}.norm.rds", samples=samples)
 	output:
 		"../data/seurat_objs/merged/merged.norm.rds"
+	conda:
+		"../envs/seurat.yaml"
 	shell:
 		"Rscript merge_seurat.R -i {input.dir} -o {output}"
 
@@ -157,6 +179,8 @@ rule cluster:
 	output:
 		"../results/umap_cluster.png",
 		"../results/clusterfeatures.csv"
+	conda:
+		"../envs/seurat.yaml"
 	shell:
 		"Rscript cluster.R -i {input}"
 
