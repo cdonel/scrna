@@ -79,6 +79,3 @@ merged_seurat.markers <- FindAllMarkers(merged_seurat, only.pos = TRUE)
 
 
 write.csv(merged_seurat.markers, "../results/clusterfeatures.csv")
-
-
-dev.off()
