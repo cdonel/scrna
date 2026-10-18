@@ -124,6 +124,8 @@ rule kb_align:
 
 
 rule kb_qc:
+	params:
+		sample = "{samples}"
 	input:
 		"../data/kb_counts/{samples}/counts_filtered/cells_x_genes.mtx"
 	output:
@@ -131,7 +133,7 @@ rule kb_qc:
 	conda:
 		"../envs/seurat.yaml"
 	shell:
-		"Rscript kb_qc.R -i {input} -n {samples} -o {output}"
+		"Rscript kb_qc.R -i {input} -n {params.sample} -o {output}"
 	
 
 rule to_seurat:
